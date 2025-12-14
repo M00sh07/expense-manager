@@ -9,21 +9,24 @@ export const sendEmail = action({
     subject: v.string(),
     html: v.string(),
     text: v.optional(v.string()),
-    apiKey: v.string(),
   },
   handler: async (ctx, args) => {
-    const resend = new Resend(args.apiKey);
+    const apiKey = process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
+      throw new Error("RESEND_API_KEY is not set");
+    }
+
+    const resend = new Resend(apiKey);
 
     try {
       const result = await resend.emails.send({
-        from: "Splitr <onboarding@resend.dev>",
+        from: "Sharely <onboarding@resend.dev>",
         to: args.to,
         subject: args.subject,
         html: args.html,
         text: args.text,
       });
-
-      console.log("Email sent successfully:", result);
 
       return { success: true, id: result.id };
     } catch (error) {
