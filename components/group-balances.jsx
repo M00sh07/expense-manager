@@ -67,7 +67,7 @@ export function GroupBalances({ balances }) {
               ? "text-green-600"
               : me.totalBalance < 0
                 ? "text-red-600"
-                : ""
+                : "text-black"
           }`}
         >
           {me.totalBalance > 0
@@ -114,7 +114,7 @@ export function GroupBalances({ balances }) {
                       <span className="text-sm">{member.name}</span>
                     </div>
                     <span className="font-medium text-green-600">
-                      ${member.amount.toFixed(2)}
+                      ₹{member.amount.toFixed(2)}
                     </span>
                   </div>
                 ))}
