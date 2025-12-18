@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { LayoutDashboard } from "lucide-react";
 import Link from "next/link";
@@ -10,35 +10,45 @@ import { BarLoader } from "react-spinners";
 import { Authenticated, Unauthenticated } from "convex/react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import ThemeToggle from "./theme-toggle";
 
 export default function Header() {
   const { isLoading } = useStoreUser();
   const path = usePathname();
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
-    <header className="fixed top-0 w-full border-b bg-white/95 backdrop-blur z-50 supports-[backdrop-filter]:bg-white/60">
+    <header className="fixed top-0 w-full border-b bg-background/95 backdrop-blur z-50 supports-[backdrop-filter]:bg-background/60">
       <nav className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <Image
-            src={"/logos/logo2.png"}
-            alt="Sharely Logo"
-            width={250}
-            height={100}
-            className="h-11 w-auto object-contain"
-          />
+          {mounted && (
+            <Image
+              src="/logos/logo4.png"
+              alt="Sharely Logo"
+              width={250}
+              height={100}
+              className="h-11 w-auto object-contain"
+              priority
+            />
+          )}
         </Link>
 
         {path === "/" && (
           <div className="hidden md:flex items-center gap-6">
             <Link
               href="#features"
-              className="text-sm font-medium hover:text-blue-500 transition"
+              className="text-sm font-medium hover:text-primary transition"
             >
               Features
             </Link>
             <Link
               href="#how-it-works"
-              className="text-sm font-medium hover:text-blue-500 0 transition"
+              className="text-sm font-medium hover:text-primary transition"
             >
               How It Works
             </Link>
@@ -46,15 +56,19 @@ export default function Header() {
         )}
 
         <div className="flex items-center gap-4">
+          {/* Theme Toggle */}
+          <ThemeToggle />
+
           <Authenticated>
             <Link href="/dashboard">
               <Button
                 variant="outline"
-                className="hidden md:inline-flex items-center gap-2 hover:text-blue-600 hover:border-blue-600 transition"
+                className="hidden md:inline-flex items-center gap-2 hover:text-primary hover:border-primary transition"
               >
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
               </Button>
+
               <Button variant="ghost" className="md:hidden w-10 h-10 p-0">
                 <LayoutDashboard className="h-4 w-4" />
               </Button>
@@ -74,18 +88,21 @@ export default function Header() {
 
           <Unauthenticated>
             <SignInButton>
-              <Button variant="ghost" className="border-black">Sign In</Button>
+              <Button variant="ghost" className="border-border">
+                Sign In
+              </Button>
             </SignInButton>
 
             <SignUpButton>
-              <Button className="bg-blue-500 hover:bg-blue-700 border-none">
+              <Button className="bg-primary hover:bg-primary/90 border-none">
                 Get Started
               </Button>
             </SignUpButton>
           </Unauthenticated>
         </div>
       </nav>
-      {isLoading && <BarLoader width={"100%"} color="#36d7b7" />}
+
+      {isLoading && <BarLoader width="100%" color="#36d7b7" />}
     </header>
   );
 }
