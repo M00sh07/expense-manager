@@ -51,9 +51,10 @@ export function GroupSelector({ onChange }) {
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Select a group" />
         </SelectTrigger>
+
         <SelectContent>
           {data.groups.map((group) => (
-            <SelectItem key={group.id} value={group.id}>
+            <SelectItem key={group._id} value={group._id}>
               <div className="flex items-center gap-2">
                 <div className="bg-primary/10 p-1 rounded-full">
                   <Users className="h-3 w-3 text-primary" />
