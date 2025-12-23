@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Users } from "lucide-react";
+import React from "react";
 
 export function GroupList({ groups }) {
   if (!groups || groups.length === 0) {
@@ -16,32 +17,41 @@ export function GroupList({ groups }) {
   return (
     <div className="space-y-3">
       {groups.map((group) => {
-        // Calculate total balance in the group
-        const balance = group.balance || 0;
-        const hasBalance = balance !== 0;
+        // ✅ Always use Convex _id (fallback to id just in case)
+        const groupId = group._id ?? group.id;
+
+        // Safety guard — prevents /groups/undefined
+        if (!groupId) return null;
+
+        const balance = group.balance ?? 0;
 
         return (
           <Link
-            href={`/groups/${group.id}`}
-            key={group.id}
-            className="flex items-center justify-between hover:bg-muted p-2 rounded-md transition-colors"
+            key={groupId}
+            href={`/groups/${groupId}`}
+            className="flex items-center justify-between rounded-md p-2 transition-colors hover:bg-muted"
           >
             <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-2 rounded-md">
+              <div className="rounded-md bg-primary/10 p-2">
                 <Users className="h-5 w-5 text-primary" />
               </div>
+
               <div>
                 <p className="font-medium">{group.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {group.members.length} members
+                  {group.members?.length ?? 0} members
                 </p>
               </div>
             </div>
 
-            {hasBalance && (
+            {balance !== 0 && (
               <span
                 className={`text-sm font-medium ${
-                  balance >= 0 ? (balance > 0 ? "text-green-600" : "text-black-600") : "text-red-600"
+                  balance > 0
+                    ? "text-green-600"
+                    : balance < 0
+                    ? "text-red-600"
+                    : "text-muted-foreground"
                 }`}
               >
                 {balance > 0 ? "+" : ""}₹{balance.toFixed(2)}

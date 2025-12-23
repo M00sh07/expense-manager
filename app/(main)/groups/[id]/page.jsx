@@ -20,14 +20,26 @@ export default function GroupExpensesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("expenses");
 
-  const { data, isLoading } = useConvexQuery(api.groups.getGroupExpenses, {
-    groupId: params.id,
-  });
+  const groupId = params?.id;
+
+  // ✅ CRITICAL FIX: block both undefined AND "undefined"
+  if (!groupId || groupId === "undefined") {
+    return (
+      <div className="container mx-auto py-12">
+        <p className="text-muted-foreground">Invalid group</p>
+      </div>
+    );
+  }
+
+  const { data, isLoading } = useConvexQuery(
+    api.groups.getGroupExpenses,
+    { groupId }
+  );
 
   if (isLoading) {
     return (
       <div className="container mx-auto py-12">
-        <BarLoader width={"100%"} color="#36d7b7" />
+        <BarLoader width="100%" color="#36d7b7" />
       </div>
     );
   }
@@ -68,7 +80,7 @@ export default function GroupExpensesPage() {
 
           <div className="flex gap-2">
             <Button asChild variant="outline">
-              <Link href={`/settlements/group/${params.id}`}>
+              <Link href={`/settlements/group/${groupId}`}>
                 <ArrowLeftRight className="mr-2 h-4 w-4" />
                 Settle up
               </Link>
@@ -83,7 +95,6 @@ export default function GroupExpensesPage() {
         </div>
       </div>
 
-      {/* Grid layout for group details */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2">
           <Card>
@@ -108,13 +119,7 @@ export default function GroupExpensesPage() {
         </div>
       </div>
 
-      {/* Tabs for expenses and settlements */}
-      <Tabs
-        defaultValue="expenses"
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-4"
-      >
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="expenses">
             Expenses ({expenses.length})
@@ -124,19 +129,19 @@ export default function GroupExpensesPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="expenses" className="space-y-4">
+        <TabsContent value="expenses">
           <ExpenseList
             expenses={expenses}
-            showOtherPerson={true}
-            isGroupExpense={true}
+            showOtherPerson
+            isGroupExpense
             userLookupMap={userLookupMap}
           />
         </TabsContent>
 
-        <TabsContent value="settlements" className="space-y-4">
+        <TabsContent value="settlements">
           <SettlementList
             settlements={settlements}
-            isGroupSettlement={true}
+            isGroupSettlement
             userLookupMap={userLookupMap}
           />
         </TabsContent>

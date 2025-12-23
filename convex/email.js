@@ -21,7 +21,7 @@ export const sendEmail = action({
 
     try {
       const result = await resend.emails.send({
-        from: "Sharely <onboarding@resend.dev>",
+        from: "Splitzy <onboarding@resend.dev>",
         to: args.to,
         subject: args.subject,
         html: args.html,

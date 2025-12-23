@@ -28,11 +28,11 @@ export default function Header() {
         <Link href="/" className="flex items-center gap-2">
           {mounted && (
             <Image
-              src="/logos/logo4.png"
-              alt="Sharely Logo"
-              width={250}
-              height={100}
-              className="h-11 w-auto object-contain"
+              src="/logos/logo_final.png"
+              alt="Splitzy Logo"
+              width={650}
+              height={400}
+              className="h-26 md:h-26 w-auto object-contain transition-transform hover:scale-110"
               priority
             />
           )}
