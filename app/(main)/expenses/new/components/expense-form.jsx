@@ -1,6 +1,6 @@
 "use client";
-
-import { useState, useEffect } from "react";
+import Tesseract from "tesseract.js";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,7 +26,9 @@ import { cn } from "@/lib/utils";
 import { CalendarIcon } from "lucide-react";
 import { getAllCategories } from "@/lib/expense-categories";
 
-// Form schema validation
+
+
+/* ---------- schema ---------- */
 const expenseSchema = z.object({
   description: z.string().min(1, "Description is required"),
   amount: z
@@ -48,13 +50,14 @@ export function ExpenseForm({ type = "individual", onSuccess }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [splits, setSplits] = useState([]);
 
-  // Mutations and queries
-  const { data: currentUser } = useConvexQuery(api.users.getCurrentUser);
+  /* OCR state */
+  const [isScanning, setIsScanning] = useState(false);
+  const fileInputRef = useRef(null);
 
+  const { data: currentUser } = useConvexQuery(api.users.getCurrentUser);
   const createExpense = useConvexMutation(api.expenses.createExpense);
   const categories = getAllCategories();
 
-  // Set up form with validation
   const {
     register,
     handleSubmit,
@@ -75,14 +78,11 @@ export function ExpenseForm({ type = "individual", onSuccess }) {
     },
   });
 
-  // Watch for changes
   const amountValue = watch("amount");
   const paidByUserId = watch("paidByUserId");
 
-  // When a user is added or removed, update the participant list
   useEffect(() => {
     if (participants.length === 0 && currentUser) {
-      // Always add the current user as a participant
       setParticipants([
         {
           id: currentUser._id,
@@ -94,58 +94,136 @@ export function ExpenseForm({ type = "individual", onSuccess }) {
     }
   }, [currentUser, participants]);
 
-  // Handle form submission
+  /* ---------- OCR ---------- */
+const handleBillScan = async (file) => {
+  if (!file) return;
+
+  try {
+    setIsScanning(true);
+
+    const {
+      data: { text },
+    } = await Tesseract.recognize(file, "eng");
+
+    console.log("OCR TEXT:\n", text);
+
+    const cleaned = text.replace(/\s+/g, " ");
+
+    /* ---------- 1. STRONG KEYWORD MATCH ---------- */
+    const keywordMatch = cleaned.match(
+      /(grand total|total amount|net payable|amount payable|balance due|total)[^\d₹]{0,15}₹?\s*([\d,]+(?:\.\d{2})?)/i
+    );
+
+    if (keywordMatch) {
+      const value = keywordMatch[2].replace(/,/g, "");
+      setValue("amount", value, { shouldValidate: true, shouldDirty: true });
+      toast.success("Amount detected");
+      return;
+    }
+
+    /* ---------- 2. LINE-AWARE FALLBACK ---------- */
+    const lines = text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    let candidates = [];
+
+    lines.forEach((line, index) => {
+      const matches = line.match(/₹?\s*\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g);
+      if (!matches) return;
+
+      matches.forEach((raw) => {
+        const value = parseFloat(raw.replace(/[₹,\s]/g, ""));
+        if (isNaN(value)) return;
+
+        candidates.push({
+          value,
+          raw,
+          line,
+          fromBottom: lines.length - index,
+        });
+      });
+    });
+
+    /* ---------- 3. FILTER OUT BAD NUMBERS ---------- */
+    candidates = candidates.filter((c) => {
+      if (/%/.test(c.line)) return false;     // GST / tax %
+      if (c.value < 10) return false;         // quantities
+      if (c.value > 100000) return false;     // phone/order IDs
+      return true;
+    });
+
+    if (!candidates.length) {
+      toast.error("Could not detect amount");
+      return;
+    }
+
+    /* ---------- 4. SCORE & PICK ---------- */
+    candidates = candidates.map((c) => {
+      let score = 0;
+      if (/\.\d{2}$/.test(c.raw)) score += 3;
+      if (c.fromBottom <= 3) score += 3;
+      if (/total|payable|balance/i.test(c.line)) score += 5;
+      score += Math.min(c.value / 50, 4);
+      return { ...c, score };
+    });
+
+    candidates.sort((a, b) => b.score - a.score);
+
+    setValue("amount", candidates[0].value.toFixed(2), {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+
+    toast.success("Amount detected");
+  } catch (err) {
+    console.error("OCR error:", err);
+    toast.error("Bill scan failed");
+  } finally {
+    setIsScanning(false);
+  }
+};
+
+
+
+  /* ---------- submit ---------- */
   const onSubmit = async (data) => {
     try {
       const amount = parseFloat(data.amount);
 
-      // Prepare splits in the format expected by the API
       const formattedSplits = splits.map((split) => ({
         userId: split.userId,
         amount: split.amount,
         paid: split.userId === data.paidByUserId,
       }));
 
-      // Validate that splits add up to the total (with small tolerance)
-      const totalSplitAmount = formattedSplits.reduce(
-        (sum, split) => sum + split.amount,
-        0
-      );
-      const tolerance = 0.01;
-
-      if (Math.abs(totalSplitAmount - amount) > tolerance) {
-        toast.error(
-          `Split amounts don't add up to the total. Please adjust your splits.`
-        );
+      const total = formattedSplits.reduce((s, x) => s + x.amount, 0);
+      if (Math.abs(total - amount) > 0.01) {
+        toast.error("Split amounts don't add up");
         return;
       }
 
-      // For 1:1 expenses, set groupId to undefined instead of empty string
       const groupId = type === "individual" ? undefined : data.groupId;
 
-      // Create the expense
       await createExpense.mutate({
         description: data.description,
-        amount: amount,
+        amount,
         category: data.category || "Other",
-        date: data.date.getTime(), // Convert to timestamp
+        date: data.date.getTime(),
         paidByUserId: data.paidByUserId,
         splitType: data.splitType,
         splits: formattedSplits,
         groupId,
       });
 
-      toast.success("Expense created successfully!");
-      reset(); // Reset form
+      toast.success("Expense created");
+      reset();
 
-      const otherParticipant = participants.find(
-        (p) => p.id !== currentUser._id
-      );
-      const otherUserId = otherParticipant?.id;
-
-      if (onSuccess) onSuccess(type === "individual" ? otherUserId : groupId);
-    } catch (error) {
-      toast.error("Failed to create expense: " + error.message);
+      const other = participants.find((p) => p.id !== currentUser._id);
+      onSuccess?.(type === "individual" ? other?.id : groupId);
+    } catch (e) {
+      toast.error("Failed to create expense");
     }
   };
 
@@ -154,35 +232,39 @@ export function ExpenseForm({ type = "individual", onSuccess }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-4">
-        {/* Description and amount */}
+        {/* Description + Amount */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Input
-              id="description"
-              placeholder="Lunch, movie tickets, etc."
-              {...register("description")}
-            />
-            {errors.description && (
-              <p className="text-sm text-red-500">
-                {errors.description.message}
-              </p>
-            )}
+            <Label>Description</Label>
+            <Input {...register("description")} />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount</Label>
-            <Input
-              id="amount"
-              placeholder="0.00"
-              type="number"
-              step="0.01"
-              min="0.01"
-              {...register("amount")}
-            />
-            {errors.amount && (
-              <p className="text-sm text-red-500">{errors.amount.message}</p>
-            )}
+            <Label>Amount</Label>
+
+            <div className="flex gap-2">
+              <Input type="number" step="0.01" {...register("amount")} />
+
+              {/* ✅ FIXED SCAN BUTTON */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) =>
+                  handleBillScan(e.target.files?.[0])
+                }
+              />
+
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isScanning}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isScanning ? "Scanning…" : "Scan bill"}
+              </Button>
+            </div>
           </div>
         </div>
 

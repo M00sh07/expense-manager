@@ -45,7 +45,7 @@ export const createExpense = mutation({
       throw new Error("Split amounts must add up to total");
     }
 
-    return await ctx.db.insert("expenses", {
+    const expenseId = await ctx.db.insert("expenses", {
       description: args.description,
       amount: args.amount,
       category: args.category || "Other",
@@ -56,6 +56,21 @@ export const createExpense = mutation({
       groupId: args.groupId,
       createdBy: user._id,
     });
+
+    // ── AUDIT LOG ───────────────────────────
+    await ctx.runMutation(internal.audit.logAudit, {
+      userId: user._id,
+      action: "CREATE_EXPENSE",
+      entityType: "expense",
+      entityId: expenseId,
+      metadata: {
+        amount: args.amount,
+        description: args.description,
+        groupId: args.groupId ?? null,
+      },
+    });
+
+    return expenseId;
   },
 });
 
@@ -67,7 +82,6 @@ export const getExpensesBetweenUsers = query({
     const me = await ctx.runQuery(internal.users.getCurrentUser);
     if (me._id === userId) throw new Error("Cannot query yourself");
 
-    /* ───── 1. Expenses paid by either user (existing behavior) ───── */
     const myPaid = await ctx.db
       .query("expenses")
       .withIndex("by_user_and_group", (q) =>
@@ -82,7 +96,6 @@ export const getExpensesBetweenUsers = query({
       )
       .collect();
 
-    /* ───── 2. ADD: Group expenses where BOTH are in splits ───── */
     const sharedGroupExpenses = (await ctx.db.query("expenses").collect()).filter(
       (e) =>
         e.groupId &&
@@ -90,7 +103,6 @@ export const getExpensesBetweenUsers = query({
         e.splits.some((s) => s.userId === userId)
     );
 
-    /* ───── 3. Merge & de-duplicate ───── */
     const expenseMap = new Map();
     [...myPaid, ...theirPaid, ...sharedGroupExpenses].forEach((e) =>
       expenseMap.set(e._id, e)
@@ -100,7 +112,6 @@ export const getExpensesBetweenUsers = query({
       (a, b) => b.date - a.date
     );
 
-    /* ───── 4. Settlements (UNCHANGED) ───── */
     const settlements = await ctx.db
       .query("settlements")
       .filter((q) =>
@@ -119,7 +130,6 @@ export const getExpensesBetweenUsers = query({
 
     settlements.sort((a, b) => b.date - a.date);
 
-    /* ───── 5. Balance calculation (UNCHANGED) ───── */
     let balance = 0;
 
     for (const e of expenses) {
@@ -137,7 +147,6 @@ export const getExpensesBetweenUsers = query({
       else balance -= s.amount;
     }
 
-    /* ───── 6. Return ───── */
     const other = await ctx.db.get(userId);
     if (!other) throw new Error("User not found");
 
@@ -154,7 +163,6 @@ export const getExpensesBetweenUsers = query({
     };
   },
 });
-
 
 /* ───────────────── DELETE EXPENSE ───────────────── */
 
@@ -197,6 +205,19 @@ export const deleteExpense = mutation({
     }
 
     await ctx.db.delete(args.expenseId);
+
+    // ── AUDIT LOG ───────────────────────────
+    await ctx.runMutation(internal.audit.logAudit, {
+      userId: user._id,
+      action: "DELETE_EXPENSE",
+      entityType: "expense",
+      entityId: args.expenseId,
+      metadata: {
+        amount: expense.amount,
+        description: expense.description,
+      },
+    });
+
     return { success: true };
   },
 });

@@ -19,17 +19,17 @@ export default defineSchema({
     amount: v.number(),
     category: v.optional(v.string()),
     date: v.number(), // timestamp
-    paidByUserId: v.id("users"), // Reference to users table
-    splitType: v.string(), // "equal", "percentage", "exact"
+    paidByUserId: v.id("users"),
+    splitType: v.string(),
     splits: v.array(
       v.object({
-        userId: v.id("users"), // Reference to users table
-        amount: v.number(), // amount owed by this user
+        userId: v.id("users"),
+        amount: v.number(),
         paid: v.boolean(),
       })
     ),
-    groupId: v.optional(v.id("groups")), // null for one-on-one expenses
-    createdBy: v.id("users"), // Reference to users table
+    groupId: v.optional(v.id("groups")),
+    createdBy: v.id("users"),
   })
     .index("by_group", ["groupId"])
     .index("by_user_and_group", ["paidByUserId", "groupId"])
@@ -39,27 +39,40 @@ export default defineSchema({
   settlements: defineTable({
     amount: v.number(),
     note: v.optional(v.string()),
-    date: v.number(), // timestamp
-    paidByUserId: v.id("users"), // Reference to users table
-    receivedByUserId: v.id("users"), // Reference to users table
-    groupId: v.optional(v.id("groups")), // null for one-on-one settlements
-    relatedExpenseIds: v.optional(v.array(v.id("expenses"))), // Which expenses this settlement covers
-    createdBy: v.id("users"), // Reference to users table
+    date: v.number(),
+    paidByUserId: v.id("users"),
+    receivedByUserId: v.id("users"),
+    groupId: v.optional(v.id("groups")),
+    relatedExpenseIds: v.optional(v.array(v.id("expenses"))),
+    createdBy: v.id("users"),
   })
     .index("by_group", ["groupId"])
     .index("by_user_and_group", ["paidByUserId", "groupId"])
     .index("by_receiver_and_group", ["receivedByUserId", "groupId"])
     .index("by_date", ["date"]),
 
+  // Audit Logs
+  auditLogs: defineTable({
+    userId: v.id("users"),
+    action: v.string(),
+    entityType: v.string(), // "expense", "group", "settlement"
+    entityId: v.string(),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_entity", ["entityType", "entityId"])
+    .index("by_user", ["userId"])
+    .index("by_time", ["createdAt"]),
+
   // Groups
   groups: defineTable({
     name: v.string(),
     description: v.optional(v.string()),
-    createdBy: v.id("users"), // Reference to users table
+    createdBy: v.id("users"),
     members: v.array(
       v.object({
-        userId: v.id("users"), // Reference to users table
-        role: v.string(), // "admin" or "member"
+        userId: v.id("users"),
+        role: v.string(),
         joinedAt: v.number(),
       })
     ),

@@ -8,6 +8,9 @@
  * @module
  */
 
+import type * as audit from "../audit.js";
+import type * as auditMutations from "../auditMutations.js";
+import type * as auditQueries from "../auditQueries.js";
 import type * as contacts from "../contacts.js";
 import type * as dashboard from "../dashboard.js";
 import type * as email from "../email.js";
@@ -25,6 +28,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  audit: typeof audit;
+  auditMutations: typeof auditMutations;
+  auditQueries: typeof auditQueries;
   contacts: typeof contacts;
   dashboard: typeof dashboard;
   email: typeof email;

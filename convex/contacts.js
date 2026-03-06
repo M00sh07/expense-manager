@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
 /* ──────────────────────────────────────────────────────────────────────────
-   1. getAllContacts – 1‑to‑1 expense contacts + groups
+   1. getAllContacts – 1-to-1 expense contacts + groups
    ──────────────────────────────────────────────────────────────────────── */
 export const getAllContacts = query({
   handler: async (ctx) => {
@@ -23,7 +23,7 @@ export const getAllContacts = query({
     const expensesNotPaidByYou = (
       await ctx.db
         .query("expenses")
-        .withIndex("by_group", (q) => q.eq("groupId", undefined)) // only 1‑to‑1
+        .withIndex("by_group", (q) => q.eq("groupId", undefined)) // only 1-to-1
         .collect()
     ).filter(
       (e) =>
@@ -103,7 +103,7 @@ export const createGroup = mutation({
         throw new Error(`User with ID ${id} not found`);
     }
 
-    return await ctx.db.insert("groups", {
+    const groupId = await ctx.db.insert("groups", {
       name: args.name.trim(),
       description: args.description?.trim() ?? "",
       createdBy: currentUser._id,
@@ -113,5 +113,19 @@ export const createGroup = mutation({
         joinedAt: Date.now(),
       })),
     });
+
+    // ── AUDIT LOG (ADDED, nothing else changed) ───────────────────────────
+    await ctx.runMutation(internal.audit.logAudit, {
+      userId: currentUser._id,
+      action: "CREATE_GROUP",
+      entityType: "group",
+      entityId: groupId,
+      metadata: {
+        name: args.name,
+        memberCount: uniqueMembers.size,
+      },
+    });
+
+    return groupId;
   },
 });
