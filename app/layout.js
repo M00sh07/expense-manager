@@ -9,7 +9,7 @@ import CursorGlow from "@/components/cursor-glow";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Sharely",
+  title: "Splitzy",
   description: "Simplest way to split expenses between groups",
 };
 
