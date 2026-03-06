@@ -5,6 +5,7 @@ import { ConvexClientProvider } from "@/components/convex-client-provided";
 import { ClerkProvider } from "@clerk/nextjs";
 import Providers from "@/components/providers";
 import CursorGlow from "@/components/cursor-glow";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -37,6 +38,9 @@ export default function RootLayout({ children }) {
             </ConvexClientProvider>
           </ClerkProvider>
         </Providers>
+
+        {/* Vercel Analytics */}
+        <Analytics />
       </body>
     </html>
   );
